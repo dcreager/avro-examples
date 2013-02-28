@@ -23,7 +23,7 @@
         </div>
         <p>This example shows how to write data into an Avro container file, and how to
 read data from a file, both with and without schema resolution.  The source
-of this example can be found <a href="http://github.com/dcreager/avro-examples/resolved-writer/">on GitHub</a>.</p>
+of this example can be found <a href="https://github.com/dcreager/avro-examples/tree/master/resolved-writer">on GitHub</a>.</p>
       </td>
       <td class=code>
         <div class='highlight'><pre><span class="cp">#include &lt;inttypes.h&gt;</span>
@@ -438,13 +438,13 @@ value instance.</p>
         </div>
         <p>Now we&rsquo;ve got the same basic loop as above.  But we&rsquo;ve got two value
 instances floating around!  Which do we use?  We have the file reader
-fill in <code>writer_schema</code>, since that&rsquo;s the value that is an instance of
-the file&rsquo;s writer schema.  Since it&rsquo;s an instance of a resolved writer,
-though, it doesn&rsquo;t actually store the value itself.  Instead, it will
+fill in <code>writer_value</code>, since that&rsquo;s the value that is an instance of the
+file&rsquo;s writer schema.  Since it&rsquo;s an instance of a resolved writer,
+though, it doesn&rsquo;t actually store any data itself.  Instead, it will
 perform schema resolution on the data read from the file, and fill in its
 wrapped value (which in our case is <code>reader_value</code>).  That means that
-once a value has been read, we can get its (schema-resolved) contents via
-<code>reader_value</code>.</p>
+once the data has been read, we can get its (schema-resolved) contents
+via <code>reader_value</code>.</p>
       </td>
       <td class=code>
         <div class='highlight'><pre>    <span class="k">while</span> <span class="p">(</span><span class="n">avro_file_reader_read_value</span><span class="p">(</span><span class="n">file</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">writer_value</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
