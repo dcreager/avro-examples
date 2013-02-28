@@ -2,7 +2,7 @@
 // read data from a file, both with and without schema resolution.  The source
 // of this example can be found [on GitHub][gh].
 //
-// [gh]: http://github.com/dcreager/avro-examples/resolved-writer/
+// [gh]: https://github.com/dcreager/avro-examples/tree/master/resolved-writer
 
 #include <inttypes.h>
 #include <stdint.h>
@@ -236,13 +236,13 @@ read_with_schema_resolution(const char *filename,
 
     // Now we've got the same basic loop as above.  But we've got two value
     // instances floating around!  Which do we use?  We have the file reader
-    // fill in `writer_schema`, since that's the value that is an instance of
-    // the file's writer schema.  Since it's an instance of a resolved writer,
-    // though, it doesn't actually store the value itself.  Instead, it will
+    // fill in `writer_value`, since that's the value that is an instance of the
+    // file's writer schema.  Since it's an instance of a resolved writer,
+    // though, it doesn't actually store any data itself.  Instead, it will
     // perform schema resolution on the data read from the file, and fill in its
     // wrapped value (which in our case is `reader_value`).  That means that
-    // once a value has been read, we can get its (schema-resolved) contents via
-    // `reader_value`.
+    // once the data has been read, we can get its (schema-resolved) contents
+    // via `reader_value`.
     while (avro_file_reader_read_value(file, &writer_value) == 0) {
         avro_value_t  field;
         int32_t  value;
