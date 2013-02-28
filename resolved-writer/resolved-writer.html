@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+  <title>resolved-writer.c</title>
+  <link rel="stylesheet" href="http://jashkenas.github.com/docco/resources/docco.css">
+</head>
+<body>
+<div id='container'>
+  <div id="background"></div>
+  <table cellspacing=0 cellpadding=0>
+  <thead>
+    <tr>
+      <th class=docs><h1>resolved-writer.c</h1></th>
+      <th class=code></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr id='section-1'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-1">&#182;</a>
+        </div>
+        <p>This example shows how to write data into an Avro container file, and how to
+read data from a file, both with and without schema resolution.  The source
+of this example can be found <a href="http://github.com/dcreager/avro-examples/resolved-writer/">on GitHub</a>.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre><span class="cp">#include &lt;inttypes.h&gt;</span>
+<span class="cp">#include &lt;stdint.h&gt;</span>
+<span class="cp">#include &lt;stdio.h&gt;</span>
+<span class="cp">#include &lt;stdlib.h&gt;</span>
+<span class="cp">#include &lt;avro.h&gt;</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-Preliminaries'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-Preliminaries">&#182;</a>
+        </div>
+        <h3>Preliminaries</h3>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre></pre></div>
+      </td>
+    </tr>
+    <tr id='section-3'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-3">&#182;</a>
+        </div>
+        <p>These macros help us check for Avro errors.  If any occur, we print out an
+error message and abort the process.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre><span class="cp">#define check_i(call) \</span>
+<span class="cp">    do { \</span>
+<span class="cp">        if ((call) != 0) { \</span>
+<span class="cp">            fprintf(stderr, &quot;Error: %s\n&quot;, avro_strerror()); \</span>
+<span class="cp">            exit(EXIT_FAILURE); \</span>
+<span class="cp">        } \</span>
+<span class="cp">    } while (0)</span>
+
+<span class="cp">#define check_p(call) \</span>
+<span class="cp">    do { \</span>
+<span class="cp">        if ((call) == NULL) { \</span>
+<span class="cp">            fprintf(stderr, &quot;Error: %s\n&quot;, avro_strerror()); \</span>
+<span class="cp">            exit(EXIT_FAILURE); \</span>
+<span class="cp">        } \</span>
+<span class="cp">    } while (0)</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-Schemas'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-Schemas">&#182;</a>
+        </div>
+        <h3>Schemas</h3>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre></pre></div>
+      </td>
+    </tr>
+    <tr id='section-5'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-5">&#182;</a>
+        </div>
+        <p>These are the schemas that we&rsquo;ll use to write and read the data.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre><span class="cp">#define WRITER_SCHEMA \</span>
+<span class="cp">    &quot;{&quot; \</span>
+<span class="cp">    &quot;  \&quot;type\&quot;: \&quot;record\&quot;,&quot; \</span>
+<span class="cp">    &quot;  \&quot;name\&quot;: \&quot;test\&quot;,&quot; \</span>
+<span class="cp">    &quot;  \&quot;fields\&quot;: [&quot; \</span>
+<span class="cp">    &quot;    { \&quot;name\&quot;: \&quot;a\&quot;, \&quot;type\&quot;: \&quot;int\&quot; },&quot; \</span>
+<span class="cp">    &quot;    { \&quot;name\&quot;: \&quot;b\&quot;, \&quot;type\&quot;: \&quot;int\&quot; }&quot; \</span>
+<span class="cp">    &quot;  ]&quot; \</span>
+<span class="cp">    &quot;}&quot;</span>
+
+<span class="cp">#define READER_SCHEMA_A \</span>
+<span class="cp">    &quot;{&quot; \</span>
+<span class="cp">    &quot;  \&quot;type\&quot;: \&quot;record\&quot;,&quot; \</span>
+<span class="cp">    &quot;  \&quot;name\&quot;: \&quot;test\&quot;,&quot; \</span>
+<span class="cp">    &quot;  \&quot;fields\&quot;: [&quot; \</span>
+<span class="cp">    &quot;    { \&quot;name\&quot;: \&quot;a\&quot;, \&quot;type\&quot;: \&quot;int\&quot; }&quot; \</span>
+<span class="cp">    &quot;  ]&quot; \</span>
+<span class="cp">    &quot;}&quot;</span>
+
+<span class="cp">#define READER_SCHEMA_B \</span>
+<span class="cp">    &quot;{&quot; \</span>
+<span class="cp">    &quot;  \&quot;type\&quot;: \&quot;record\&quot;,&quot; \</span>
+<span class="cp">    &quot;  \&quot;name\&quot;: \&quot;test\&quot;,&quot; \</span>
+<span class="cp">    &quot;  \&quot;fields\&quot;: [&quot; \</span>
+<span class="cp">    &quot;    { \&quot;name\&quot;: \&quot;b\&quot;, \&quot;type\&quot;: \&quot;int\&quot; }&quot; \</span>
+<span class="cp">    &quot;  ]&quot; \</span>
+<span class="cp">    &quot;}&quot;</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-Writing_data'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-Writing_data">&#182;</a>
+        </div>
+        <h3>Writing data</h3>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre></pre></div>
+      </td>
+    </tr>
+    <tr id='section-7'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-7">&#182;</a>
+        </div>
+        <p>This function writes a sequence of integers into a new Avro data file, using
+the <code>WRITER_SCHEMA</code>.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre><span class="k">static</span> <span class="kt">void</span>
+<span class="nf">write_data</span><span class="p">(</span><span class="k">const</span> <span class="kt">char</span> <span class="o">*</span><span class="n">filename</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="kt">avro_file_writer_t</span>  <span class="n">file</span><span class="p">;</span>
+    <span class="kt">avro_schema_t</span>  <span class="n">writer_schema</span><span class="p">;</span>
+    <span class="kt">avro_schema_error_t</span>  <span class="n">error</span><span class="p">;</span>
+    <span class="kt">avro_value_iface_t</span>  <span class="o">*</span><span class="n">writer_iface</span><span class="p">;</span>
+    <span class="kt">avro_value_t</span>  <span class="n">writer_value</span><span class="p">;</span>
+    <span class="kt">avro_value_t</span>  <span class="n">field</span><span class="p">;</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-8'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-8">&#182;</a>
+        </div>
+        <p>First parse the JSON schema into the C API&rsquo;s internal schema
+representation.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>    <span class="n">check_i</span><span class="p">(</span><span class="n">avro_schema_from_json</span><span class="p">(</span><span class="n">WRITER_SCHEMA</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">writer_schema</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">error</span><span class="p">));</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-9'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-9">&#182;</a>
+        </div>
+        <p>Then create a value that is an instance of that schema.  We use the
+built-in &ldquo;generic&rdquo; value implementation, which is what you&rsquo;ll usually use
+to create value instances that can actually store data.  We only need to
+create one instance, since we can re-use it for all of the values that
+we&rsquo;re going to write into the file.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>    <span class="n">check_p</span><span class="p">(</span><span class="n">writer_iface</span> <span class="o">=</span> <span class="n">avro_generic_class_from_schema</span><span class="p">(</span><span class="n">writer_schema</span><span class="p">));</span>
+    <span class="n">check_i</span><span class="p">(</span><span class="n">avro_generic_value_new</span><span class="p">(</span><span class="n">writer_iface</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">writer_value</span><span class="p">));</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-10'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-10">&#182;</a>
+        </div>
+        <p>Open a new data file for writing, and then write a slew of records into
+it.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>    <span class="n">check_i</span><span class="p">(</span><span class="n">avro_file_writer_create</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">writer_schema</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">file</span><span class="p">));</span>
+
+    <span class="cm">/* record 1 */</span>
+    <span class="n">check_i</span><span class="p">(</span><span class="n">avro_value_get_by_name</span><span class="p">(</span><span class="o">&amp;</span><span class="n">writer_value</span><span class="p">,</span> <span class="s">&quot;a&quot;</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">field</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">));</span>
+    <span class="n">check_i</span><span class="p">(</span><span class="n">avro_value_set_int</span><span class="p">(</span><span class="o">&amp;</span><span class="n">field</span><span class="p">,</span> <span class="mi">10</span><span class="p">));</span>
+    <span class="n">check_i</span><span class="p">(</span><span class="n">avro_value_get_by_name</span><span class="p">(</span><span class="o">&amp;</span><span class="n">writer_value</span><span class="p">,</span> <span class="s">&quot;b&quot;</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">field</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">));</span>
+    <span class="n">check_i</span><span class="p">(</span><span class="n">avro_value_set_int</span><span class="p">(</span><span class="o">&amp;</span><span class="n">field</span><span class="p">,</span> <span class="mi">11</span><span class="p">));</span>
+    <span class="n">check_i</span><span class="p">(</span><span class="n">avro_file_writer_append_value</span><span class="p">(</span><span class="n">file</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">writer_value</span><span class="p">));</span>
+
+    <span class="cm">/* record 2 */</span>
+    <span class="n">check_i</span><span class="p">(</span><span class="n">avro_value_get_by_name</span><span class="p">(</span><span class="o">&amp;</span><span class="n">writer_value</span><span class="p">,</span> <span class="s">&quot;a&quot;</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">field</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">));</span>
+    <span class="n">check_i</span><span class="p">(</span><span class="n">avro_value_set_int</span><span class="p">(</span><span class="o">&amp;</span><span class="n">field</span><span class="p">,</span> <span class="mi">20</span><span class="p">));</span>
+    <span class="n">check_i</span><span class="p">(</span><span class="n">avro_value_get_by_name</span><span class="p">(</span><span class="o">&amp;</span><span class="n">writer_value</span><span class="p">,</span> <span class="s">&quot;b&quot;</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">field</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">));</span>
+    <span class="n">check_i</span><span class="p">(</span><span class="n">avro_value_set_int</span><span class="p">(</span><span class="o">&amp;</span><span class="n">field</span><span class="p">,</span> <span class="mi">21</span><span class="p">));</span>
+    <span class="n">check_i</span><span class="p">(</span><span class="n">avro_file_writer_append_value</span><span class="p">(</span><span class="n">file</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">writer_value</span><span class="p">));</span>
+
+    <span class="cm">/* record 3 */</span>
+    <span class="n">check_i</span><span class="p">(</span><span class="n">avro_value_get_by_name</span><span class="p">(</span><span class="o">&amp;</span><span class="n">writer_value</span><span class="p">,</span> <span class="s">&quot;a&quot;</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">field</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">));</span>
+    <span class="n">check_i</span><span class="p">(</span><span class="n">avro_value_set_int</span><span class="p">(</span><span class="o">&amp;</span><span class="n">field</span><span class="p">,</span> <span class="mi">30</span><span class="p">));</span>
+    <span class="n">check_i</span><span class="p">(</span><span class="n">avro_value_get_by_name</span><span class="p">(</span><span class="o">&amp;</span><span class="n">writer_value</span><span class="p">,</span> <span class="s">&quot;b&quot;</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">field</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">));</span>
+    <span class="n">check_i</span><span class="p">(</span><span class="n">avro_value_set_int</span><span class="p">(</span><span class="o">&amp;</span><span class="n">field</span><span class="p">,</span> <span class="mi">31</span><span class="p">));</span>
+    <span class="n">check_i</span><span class="p">(</span><span class="n">avro_file_writer_append_value</span><span class="p">(</span><span class="n">file</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">writer_value</span><span class="p">));</span>
+
+    <span class="cm">/* record 4 */</span>
+    <span class="n">check_i</span><span class="p">(</span><span class="n">avro_value_get_by_name</span><span class="p">(</span><span class="o">&amp;</span><span class="n">writer_value</span><span class="p">,</span> <span class="s">&quot;a&quot;</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">field</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">));</span>
+    <span class="n">check_i</span><span class="p">(</span><span class="n">avro_value_set_int</span><span class="p">(</span><span class="o">&amp;</span><span class="n">field</span><span class="p">,</span> <span class="mi">40</span><span class="p">));</span>
+    <span class="n">check_i</span><span class="p">(</span><span class="n">avro_value_get_by_name</span><span class="p">(</span><span class="o">&amp;</span><span class="n">writer_value</span><span class="p">,</span> <span class="s">&quot;b&quot;</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">field</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">));</span>
+    <span class="n">check_i</span><span class="p">(</span><span class="n">avro_value_set_int</span><span class="p">(</span><span class="o">&amp;</span><span class="n">field</span><span class="p">,</span> <span class="mi">41</span><span class="p">));</span>
+    <span class="n">check_i</span><span class="p">(</span><span class="n">avro_file_writer_append_value</span><span class="p">(</span><span class="n">file</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">writer_value</span><span class="p">));</span>
+
+    <span class="cm">/* record 5 */</span>
+    <span class="n">check_i</span><span class="p">(</span><span class="n">avro_value_get_by_name</span><span class="p">(</span><span class="o">&amp;</span><span class="n">writer_value</span><span class="p">,</span> <span class="s">&quot;a&quot;</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">field</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">));</span>
+    <span class="n">check_i</span><span class="p">(</span><span class="n">avro_value_set_int</span><span class="p">(</span><span class="o">&amp;</span><span class="n">field</span><span class="p">,</span> <span class="mi">50</span><span class="p">));</span>
+    <span class="n">check_i</span><span class="p">(</span><span class="n">avro_value_get_by_name</span><span class="p">(</span><span class="o">&amp;</span><span class="n">writer_value</span><span class="p">,</span> <span class="s">&quot;b&quot;</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">field</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">));</span>
+    <span class="n">check_i</span><span class="p">(</span><span class="n">avro_value_set_int</span><span class="p">(</span><span class="o">&amp;</span><span class="n">field</span><span class="p">,</span> <span class="mi">51</span><span class="p">));</span>
+    <span class="n">check_i</span><span class="p">(</span><span class="n">avro_file_writer_append_value</span><span class="p">(</span><span class="n">file</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">writer_value</span><span class="p">));</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-11'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-11">&#182;</a>
+        </div>
+        <p>Close the file and clean up after ourselves.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>    <span class="n">avro_file_writer_close</span><span class="p">(</span><span class="n">file</span><span class="p">);</span>
+    <span class="n">avro_value_decref</span><span class="p">(</span><span class="o">&amp;</span><span class="n">writer_value</span><span class="p">);</span>
+    <span class="n">avro_value_iface_decref</span><span class="p">(</span><span class="n">writer_iface</span><span class="p">);</span>
+    <span class="n">avro_schema_decref</span><span class="p">(</span><span class="n">writer_schema</span><span class="p">);</span>
+<span class="p">}</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-Reading_using_the_actual_writer_schema'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-Reading_using_the_actual_writer_schema">&#182;</a>
+        </div>
+        <h3>Reading using the actual writer schema</h3>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre></pre></div>
+      </td>
+    </tr>
+    <tr id='section-13'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-13">&#182;</a>
+        </div>
+        <p>In this example, we read data from a file, and use the actual writer schema
+when we create the value instance to read into.  We&rsquo;re being a little bit
+loosy-goosy here, because we&rsquo;re assuming that the writer schema is
+<code>WRITER_SCHEMA</code>, and that there are <code>int</code> fields named <code>a</code> and <code>b</code> that we
+can grab.  If we were being <em>really</em> well-behaved, we&rsquo;d dynamically
+interrogate the writer schema to see what fields are available.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre><span class="k">static</span> <span class="kt">void</span>
+<span class="nf">read_using_writer_schema</span><span class="p">(</span><span class="k">const</span> <span class="kt">char</span> <span class="o">*</span><span class="n">filename</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="kt">avro_file_reader_t</span>  <span class="n">file</span><span class="p">;</span>
+    <span class="kt">avro_schema_t</span>  <span class="n">writer_schema</span><span class="p">;</span>
+    <span class="kt">avro_value_iface_t</span>  <span class="o">*</span><span class="n">writer_iface</span><span class="p">;</span>
+    <span class="kt">avro_value_t</span>  <span class="n">writer_value</span><span class="p">;</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-14'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-14">&#182;</a>
+        </div>
+        <p>Open an Avro file and grab the writer schema that was used to create the
+file.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>    <span class="n">check_i</span><span class="p">(</span><span class="n">avro_file_reader</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">file</span><span class="p">));</span>
+    <span class="n">writer_schema</span> <span class="o">=</span> <span class="n">avro_file_reader_get_writer_schema</span><span class="p">(</span><span class="n">file</span><span class="p">);</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-15'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-15">&#182;</a>
+        </div>
+        <p>Then create a value that is an instance of the writer schema.  As above,
+we use the built-in &ldquo;generic&rdquo; value implementation for the value instance
+that will actually store the data.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>    <span class="n">check_p</span><span class="p">(</span><span class="n">writer_iface</span> <span class="o">=</span> <span class="n">avro_generic_class_from_schema</span><span class="p">(</span><span class="n">writer_schema</span><span class="p">));</span>
+    <span class="n">check_i</span><span class="p">(</span><span class="n">avro_generic_value_new</span><span class="p">(</span><span class="n">writer_iface</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">writer_value</span><span class="p">));</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-16'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-16">&#182;</a>
+        </div>
+        <p>Read values from the file until we run out, printing the contents of each
+one.  Here, we can read directly into <code>writer_value</code> since we know that
+it&rsquo;s an instance of the schema that was used to create the file.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>    <span class="k">while</span> <span class="p">(</span><span class="n">avro_file_reader_read_value</span><span class="p">(</span><span class="n">file</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">writer_value</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+        <span class="kt">avro_value_t</span>  <span class="n">field</span><span class="p">;</span>
+        <span class="kt">int32_t</span>  <span class="n">a</span><span class="p">;</span>
+        <span class="kt">int32_t</span>  <span class="n">b</span><span class="p">;</span>
+
+        <span class="n">check_i</span><span class="p">(</span><span class="n">avro_value_get_by_name</span><span class="p">(</span><span class="o">&amp;</span><span class="n">writer_value</span><span class="p">,</span> <span class="s">&quot;a&quot;</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">field</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">));</span>
+        <span class="n">check_i</span><span class="p">(</span><span class="n">avro_value_get_int</span><span class="p">(</span><span class="o">&amp;</span><span class="n">field</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">a</span><span class="p">));</span>
+        <span class="n">check_i</span><span class="p">(</span><span class="n">avro_value_get_by_name</span><span class="p">(</span><span class="o">&amp;</span><span class="n">writer_value</span><span class="p">,</span> <span class="s">&quot;b&quot;</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">field</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">));</span>
+        <span class="n">check_i</span><span class="p">(</span><span class="n">avro_value_get_int</span><span class="p">(</span><span class="o">&amp;</span><span class="n">field</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">b</span><span class="p">));</span>
+        <span class="n">printf</span><span class="p">(</span><span class="s">&quot;  a: %&quot;</span> <span class="n">PRId32</span> <span class="s">&quot;, b: %&quot;</span> <span class="n">PRId32</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">);</span>
+    <span class="p">}</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-17'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-17">&#182;</a>
+        </div>
+        <p>Close the file and clean up after ourselves.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>    <span class="n">avro_file_reader_close</span><span class="p">(</span><span class="n">file</span><span class="p">);</span>
+    <span class="n">avro_value_decref</span><span class="p">(</span><span class="o">&amp;</span><span class="n">writer_value</span><span class="p">);</span>
+    <span class="n">avro_value_iface_decref</span><span class="p">(</span><span class="n">writer_iface</span><span class="p">);</span>
+    <span class="n">avro_schema_decref</span><span class="p">(</span><span class="n">writer_schema</span><span class="p">);</span>
+<span class="p">}</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-Schema_resolution'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-Schema_resolution">&#182;</a>
+        </div>
+        <h3>Schema resolution</h3>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre></pre></div>
+      </td>
+    </tr>
+    <tr id='section-19'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-19">&#182;</a>
+        </div>
+        <p>In this example, we read from the same data file, but using schema resolution
+to project away all but one of the original fields.  The function lets you
+pass in the reader schema, and the name of the field that&rsquo;s included in the
+reader schema.  That lets us test the projection on both fields without quite
+so much copy-pasta.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre><span class="k">static</span> <span class="kt">void</span>
+<span class="nf">read_with_schema_resolution</span><span class="p">(</span><span class="k">const</span> <span class="kt">char</span> <span class="o">*</span><span class="n">filename</span><span class="p">,</span>
+                            <span class="k">const</span> <span class="kt">char</span> <span class="o">*</span><span class="n">reader_schema_json</span><span class="p">,</span>
+                            <span class="k">const</span> <span class="kt">char</span> <span class="o">*</span><span class="n">field_name</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="kt">avro_file_reader_t</span>  <span class="n">file</span><span class="p">;</span>
+    <span class="kt">avro_schema_error_t</span>  <span class="n">error</span><span class="p">;</span>
+    <span class="kt">avro_schema_t</span>  <span class="n">reader_schema</span><span class="p">;</span>
+    <span class="kt">avro_schema_t</span>  <span class="n">writer_schema</span><span class="p">;</span>
+    <span class="kt">avro_value_iface_t</span>  <span class="o">*</span><span class="n">writer_iface</span><span class="p">;</span>
+    <span class="kt">avro_value_iface_t</span>  <span class="o">*</span><span class="n">reader_iface</span><span class="p">;</span>
+    <span class="kt">avro_value_t</span>  <span class="n">writer_value</span><span class="p">;</span>
+    <span class="kt">avro_value_t</span>  <span class="n">reader_value</span><span class="p">;</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-20'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-20">&#182;</a>
+        </div>
+        <p>Open an Avro file and grab the writer schema that was used to create the
+file.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>    <span class="n">check_i</span><span class="p">(</span><span class="n">avro_file_reader</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">file</span><span class="p">));</span>
+    <span class="n">writer_schema</span> <span class="o">=</span> <span class="n">avro_file_reader_get_writer_schema</span><span class="p">(</span><span class="n">file</span><span class="p">);</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-21'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-21">&#182;</a>
+        </div>
+        <p>Create a value instance that we want to read the data into.  Note that
+this is <em>not</em> the writer schema!</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>    <span class="n">check_i</span><span class="p">(</span><span class="n">avro_schema_from_json</span>
+            <span class="p">(</span><span class="n">reader_schema_json</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">reader_schema</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">error</span><span class="p">));</span>
+    <span class="n">check_p</span><span class="p">(</span><span class="n">reader_iface</span> <span class="o">=</span> <span class="n">avro_generic_class_from_schema</span><span class="p">(</span><span class="n">reader_schema</span><span class="p">));</span>
+    <span class="n">check_i</span><span class="p">(</span><span class="n">avro_generic_value_new</span><span class="p">(</span><span class="n">reader_iface</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">reader_value</span><span class="p">));</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-22'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-22">&#182;</a>
+        </div>
+        <p>Create a resolved writer that will perform the schema resolution for us.
+If the two schemas aren&rsquo;t compatible, this function will return an error,
+and the error text should describe which parts of the schemas are
+incompatible.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>    <span class="n">check_p</span><span class="p">(</span><span class="n">writer_iface</span> <span class="o">=</span>
+            <span class="n">avro_resolved_writer_new</span><span class="p">(</span><span class="n">writer_schema</span><span class="p">,</span> <span class="n">reader_schema</span><span class="p">));</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-23'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-23">&#182;</a>
+        </div>
+        <p>Create an instance of the resolved writer, and tell it to wrap our reader
+value instance.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>    <span class="n">check_i</span><span class="p">(</span><span class="n">avro_resolved_writer_new_value</span><span class="p">(</span><span class="n">writer_iface</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">writer_value</span><span class="p">));</span>
+    <span class="n">avro_resolved_writer_set_dest</span><span class="p">(</span><span class="o">&amp;</span><span class="n">writer_value</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">reader_value</span><span class="p">);</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-24'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-24">&#182;</a>
+        </div>
+        <p>Now we&rsquo;ve got the same basic loop as above.  But we&rsquo;ve got two value
+instances floating around!  Which do we use?  We have the file reader
+fill in <code>writer_schema</code>, since that&rsquo;s the value that is an instance of
+the file&rsquo;s writer schema.  Since it&rsquo;s an instance of a resolved writer,
+though, it doesn&rsquo;t actually store the value itself.  Instead, it will
+perform schema resolution on the data read from the file, and fill in its
+wrapped value (which in our case is <code>reader_value</code>).  That means that
+once a value has been read, we can get its (schema-resolved) contents via
+<code>reader_value</code>.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>    <span class="k">while</span> <span class="p">(</span><span class="n">avro_file_reader_read_value</span><span class="p">(</span><span class="n">file</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">writer_value</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+        <span class="kt">avro_value_t</span>  <span class="n">field</span><span class="p">;</span>
+        <span class="kt">int32_t</span>  <span class="n">value</span><span class="p">;</span>
+
+        <span class="n">check_i</span><span class="p">(</span><span class="n">avro_value_get_by_name</span><span class="p">(</span><span class="o">&amp;</span><span class="n">reader_value</span><span class="p">,</span> <span class="n">field_name</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">field</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">));</span>
+        <span class="n">check_i</span><span class="p">(</span><span class="n">avro_value_get_int</span><span class="p">(</span><span class="o">&amp;</span><span class="n">field</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">value</span><span class="p">));</span>
+        <span class="n">printf</span><span class="p">(</span><span class="s">&quot;  %s: %&quot;</span> <span class="n">PRId32</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">field_name</span><span class="p">,</span> <span class="n">value</span><span class="p">);</span>
+    <span class="p">}</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-25'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-25">&#182;</a>
+        </div>
+        <p>Close the file and clean up after ourselves.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>    <span class="n">avro_file_reader_close</span><span class="p">(</span><span class="n">file</span><span class="p">);</span>
+    <span class="n">avro_value_decref</span><span class="p">(</span><span class="o">&amp;</span><span class="n">writer_value</span><span class="p">);</span>
+    <span class="n">avro_value_iface_decref</span><span class="p">(</span><span class="n">writer_iface</span><span class="p">);</span>
+    <span class="n">avro_schema_decref</span><span class="p">(</span><span class="n">writer_schema</span><span class="p">);</span>
+    <span class="n">avro_value_decref</span><span class="p">(</span><span class="o">&amp;</span><span class="n">reader_value</span><span class="p">);</span>
+    <span class="n">avro_value_iface_decref</span><span class="p">(</span><span class="n">reader_iface</span><span class="p">);</span>
+    <span class="n">avro_schema_decref</span><span class="p">(</span><span class="n">reader_schema</span><span class="p">);</span>
+<span class="p">}</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-Postliminaries?'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-Postliminaries?">&#182;</a>
+        </div>
+        <h3>Postliminaries?</h3>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre></pre></div>
+      </td>
+    </tr>
+    <tr id='section-27'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-27">&#182;</a>
+        </div>
+        <p>And finally the function that gets this party started.</p>
+
+      </td>
+      <td class=code>
+        <div class='highlight'><pre><span class="kt">int</span>
+<span class="nf">main</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="cp">#define FILENAME  &quot;test-data.avro&quot;</span>
+
+    <span class="n">printf</span><span class="p">(</span><span class="s">&quot;Writing data...</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+    <span class="n">write_data</span><span class="p">(</span><span class="n">FILENAME</span><span class="p">);</span>
+
+    <span class="n">printf</span><span class="p">(</span><span class="s">&quot;Reading data using same schema...</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+    <span class="n">read_using_writer_schema</span><span class="p">(</span><span class="n">FILENAME</span><span class="p">);</span>
+
+    <span class="n">printf</span><span class="p">(</span><span class="s">&quot;Reading data with schema resolution, keeping field </span><span class="se">\&quot;</span><span class="s">a</span><span class="se">\&quot;</span><span class="s">...</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+    <span class="n">read_with_schema_resolution</span><span class="p">(</span><span class="n">FILENAME</span><span class="p">,</span> <span class="n">READER_SCHEMA_A</span><span class="p">,</span> <span class="s">&quot;a&quot;</span><span class="p">);</span>
+
+    <span class="n">printf</span><span class="p">(</span><span class="s">&quot;Reading data with schema resolution, keeping field </span><span class="se">\&quot;</span><span class="s">b</span><span class="se">\&quot;</span><span class="s">...</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+    <span class="n">read_with_schema_resolution</span><span class="p">(</span><span class="n">FILENAME</span><span class="p">,</span> <span class="n">READER_SCHEMA_B</span><span class="p">,</span> <span class="s">&quot;b&quot;</span><span class="p">);</span>
+
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span></pre></div>
+      </td>
+    </tr>
+  </table>
+</div>
+</body>
