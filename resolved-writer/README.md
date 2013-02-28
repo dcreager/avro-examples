@@ -29,7 +29,7 @@ To run the example:
 This directory also containes a [nicely formatted version][formatted] of the
 source code.
 
-[formatted]: resolved-writer.html
+[formatted]: http://dcreager.github.com/avro-examples/resolved-writer.html
 
 If you update the source code for some reason, you can regenerate the formatted
 version if if you have [Rocco][rocco] installed:
