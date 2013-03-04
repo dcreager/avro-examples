@@ -1,4 +1,3 @@
 ## Avro examples
 
-This repo contains a handful of examples (er, well, one example) of how to use
-the Avro C API.
+This repo contains a handful of examples of how to use the Avro API using some of the various implementations.
