@@ -197,9 +197,9 @@ read_using_writer_schema(const char *filename)
 // so much copy-pasta.
 
 static void
-read_with_schema_resolution(const char *filename,
-                            const char *reader_schema_json,
-                            const char *field_name)
+read_with_schema_resolution_writer(const char *filename,
+                                   const char *reader_schema_json,
+                                   const char *field_name)
 {
     avro_file_reader_t  file;
     avro_schema_error_t  error;
@@ -262,6 +262,64 @@ read_with_schema_resolution(const char *filename,
     avro_schema_decref(reader_schema);
 }
 
+static void
+read_with_schema_resolution_reader(const char *filename,
+                            const char *reader_schema_json,
+                            const char *field_name)
+{
+    avro_file_reader_t  file;
+    avro_schema_error_t  error;
+    avro_schema_t  reader_schema;
+    avro_schema_t  writer_schema;
+    avro_value_iface_t  *writer_iface;
+    avro_value_iface_t  *reader_iface;
+    avro_value_t  writer_value;
+    avro_value_t  reader_value;
+
+    // Open an Avro file and grab the writer schema that was used to create the
+    // file.
+    check_i(avro_file_reader(filename, &file));
+    writer_schema = avro_file_reader_get_writer_schema(file);
+
+    // Create a value instance that we want to read the data into.  Note that
+    // this is *not* the writer schema!
+    check_i(avro_schema_from_json
+            (reader_schema_json, 0, &reader_schema, &error));
+    check_p(writer_iface = avro_generic_class_from_schema(writer_schema));
+    check_i(avro_generic_value_new(writer_iface, &writer_value));
+
+    // Create a resolved reader that will perform the schema resolution for us.
+    // If the two schemas aren't compatible, this function will return an error,
+    // and the error text should describe which parts of the schemas are
+    // incompatible.
+    check_p(reader_iface =
+            avro_resolved_reader_new(writer_schema, reader_schema));
+
+    // Create an instance of the resolved reader, and tell it to wrap our
+    // value instance.
+    check_i(avro_resolved_reader_new_value(reader_iface, &reader_value));
+    avro_resolved_reader_set_source(&reader_value, &writer_value);
+
+    // Now we've got the same basic loop as above.
+    while (avro_file_reader_read_value(file, &writer_value) == 0) {
+        avro_value_t  field;
+        int32_t  value;
+
+        check_i(avro_value_get_by_name(&reader_value, field_name, &field, NULL));
+        check_i(avro_value_get_int(&field, &value));
+        printf("  %s: %" PRId32 "\n", field_name, value);
+    }
+
+    // Close the file and clean up after ourselves.
+    avro_file_reader_close(file);
+    avro_value_decref(&writer_value);
+    avro_value_iface_decref(reader_iface);
+    avro_schema_decref(writer_schema);
+    avro_value_decref(&reader_value);
+    avro_value_iface_decref(reader_iface);
+    avro_schema_decref(reader_schema);
+}
+
 
 // ### Postliminaries?
 
@@ -278,11 +336,17 @@ main(void)
     printf("Reading data using same schema...\n");
     read_using_writer_schema(FILENAME);
 
-    printf("Reading data with schema resolution, keeping field \"a\"...\n");
-    read_with_schema_resolution(FILENAME, READER_SCHEMA_A, "a");
+    printf("Reading data with schema resolution using writer, keeping field \"a\"...\n");
+    read_with_schema_resolution_writer(FILENAME, READER_SCHEMA_A, "a");
 
-    printf("Reading data with schema resolution, keeping field \"b\"...\n");
-    read_with_schema_resolution(FILENAME, READER_SCHEMA_B, "b");
+    printf("Reading data with schema resolution using writer, keeping field \"b\"...\n");
+    read_with_schema_resolution_writer(FILENAME, READER_SCHEMA_B, "b");
+
+    printf("Reading data with schema resolution using reader, keeping field \"a\"...\n");
+    read_with_schema_resolution_reader(FILENAME, READER_SCHEMA_A, "a");
+
+    printf("Reading data with schema resolution using reader, keeping field \"b\"...\n");
+    read_with_schema_resolution_reader(FILENAME, READER_SCHEMA_B, "b");
 
     return 0;
 }
