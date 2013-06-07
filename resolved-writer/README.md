@@ -13,13 +13,25 @@ To run the example:
       a: 30, b: 31
       a: 40, b: 41
       a: 50, b: 51
-    Reading data with schema resolution, keeping field "a"...
+    Reading data with schema resolution using writer, keeping field "a"...
       a: 10
       a: 20
       a: 30
       a: 40
       a: 50
-    Reading data with schema resolution, keeping field "b"...
+    Reading data with schema resolution using writer, keeping field "b"...
+      b: 11
+      b: 21
+      b: 31
+      b: 41
+      b: 51
+    Reading data with schema resolution using reader, keeping field "a"...
+      a: 10
+      a: 20
+      a: 30
+      a: 40
+      a: 50
+    Reading data with schema resolution using reader, keeping field "b"...
       b: 11
       b: 21
       b: 31
